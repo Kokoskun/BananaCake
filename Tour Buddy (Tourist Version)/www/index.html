@@ -1,0 +1,403 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src * data: gap: https://ssl.gstatic.com; style-src * 'unsafe-inline'; script-src * 'unsafe-inline' 'unsafe-eval'">
+  <script src="components/loader.js"></script>
+  <script src="lib/onsenui/js/onsenui.min.js"></script>
+
+  <link rel="stylesheet" href="components/loader.css">
+  <link rel="stylesheet" href="lib/onsenui/css/onsenui.css">
+  <link rel="stylesheet" href="lib/onsenui/css/onsen-css-components.css">
+  <link rel="stylesheet" href="css/style.css">
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.10/handlebars.min.js"></script>
+  <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDWjAffpPYa_qhhyRDAkQLVgexVCeUx5Vc"></script>
+  
+  <script id="tour-template" type="text/x-handlebars-template">
+      <ons-list-item modifier="chevron" tappable="" id="push-buttonx" class="list-item list-item--chevron" onclick="showTourDetails('{{id}}');">
+          <div class="left">
+            <img class="list-item__thumbnail" src="https://us-central1-bangkok-appfest-banaca-cake.cloudfunctions.net/isItDoug">
+          </div>
+          <div class="center list-item__center list-item--chevron__center">
+            <span class="list-item__title list-item--chevron__title">{{title}}</span><span class="list-item__subtitle list-item--chevron__subtitle">{{time}}, 3 hours</span><span class="list-item__subtitle list-item--chevron__subtitle">{{location}}</span>
+          </div>
+        </ons-list-item>
+    </script>
+
+  <script src="https://www.gstatic.com/firebasejs/4.4.0/firebase.js"></script>
+    <script>
+      // Initialize Firebase
+      var config = {
+        apiKey: "AIzaSyAKv5LcXlFkG_JCvEu--5KGuzyLjdyCWIw",
+        authDomain: "bangkok-appfest-banaca-cake.firebaseapp.com",
+        databaseURL: "https://bangkok-appfest-banaca-cake.firebaseio.com",
+        projectId: "bangkok-appfest-banaca-cake",
+        storageBucket: "bangkok-appfest-banaca-cake.appspot.com",
+        messagingSenderId: "663278016129"
+      };
+      firebase.initializeApp(config);
+      
+      var fbUser;
+      var fbUserData;
+      var currentTour;
+      
+    
+    
+    // Page init event
+    document.addEventListener('init', function(event) {
+      var page = event.target;
+
+      if (page.matches('#first-page')) {
+          
+        firebase.database().ref('/tours').once('value').then(function(snapshot) {
+            var tours = Object.keys(snapshot.val()).map(function(key) {
+                return [key, snapshot.val()[key]];
+            });
+            console.log(tours);
+            
+            // Sort all tours by when they start
+            tours.sort(function (a, b) {
+              if (a[1].info.Time > b[1].info.Time) {
+                return 1;
+              }
+              if (a[1].info.Time < b[1].info.Time) {
+                return -1;
+              }
+              
+              // a muss gleich b sein
+              return 0;
+            });
+            
+            // Go through all tours
+            var source   = document.querySelector("#tour-template").innerHTML;
+            var template = Handlebars.compile(source);
+            var threeHoursBefore = new Date();
+            threeHoursBefore.setHours(threeHoursBefore.getHours() - 3);
+            for (i = 0; i < tours.length; i++) {                
+                // If the tour started less than 3 hours ago, lets display it
+                if(new Date(tours[i][1].info.Time) > threeHoursBefore){
+                    
+                    var context = {id: tours[i][0], title: tours[i][1].info.name, time: new Date(tours[i][1].info.Time).toLocaleString(), location: tours[i][1].info.Location};
+                    var html    = template(context);
+                    var div = document.createElement('div');
+                    div.innerHTML = html;
+                    var elements = div.childNodes;
+                    console.log(elements);
+                    console.log(elements[1]);
+                    document.getElementsByClassName("list")[0].appendChild(elements[1]);
+                    
+                    // If we're a guide and the tour already started
+                    console.log("Checking for active tour");
+                    
+                        console.log("User is guide");
+                        console.log(new Date(tours[i][1].info.Time));
+                        console.log(new Date());
+                        if(new Date(tours[i][1].info.Time) < new Date()) {
+                            console.log("Tour is active");
+                            currentTour = tours[i][0];
+                        }
+                    
+                }
+            }
+            
+        });        
+
+        
+      } else if (page.matches('#second-page')) {
+
+        page.querySelector('#button-save').onclick = function() {
+            console.log("saving");
+            console.log(fbUser);
+            
+            firebase.database().ref().child('tours').push({                    
+              "guide" : {
+                "firstname" : fbUserData.firstname,
+                "id" : fbUser.uid,
+                "lastname" : fbUserData.lastname
+              },
+              "info" : {
+                "Location" : page.querySelector('#location').value,
+                "Time" : page.querySelector('#time').value,
+                "description" : page.querySelector('#description').value,
+                "latitude" : 10.003,
+                "longitude" : 23.43567,
+                "name" : page.querySelector('#tripname').value
+              }    
+            });
+            
+            
+          document.querySelector('#navigator').popPage();
+        };
+
+      } else if (page.matches('#login-page')) {
+          
+          firebase.auth().onAuthStateChanged(function(user) {
+              if (user) {
+                // User is signed in.
+                login_after(user);
+              } else {
+                // No user is signed in.
+              }
+            });
+
+            firebase.auth().signInAnonymously().then(function(user){
+                login_after(user);
+            }).catch(function(error) {
+                ons.notification.alert("Couldn't log you in. Something went wrong.");
+              // Handle Errors here.
+              var errorCode = error.code;
+              var errorMessage = error.message;
+              // ...
+            });
+
+      } else if (page.matches('#detail-page')) {
+          
+          console.log(document.querySelector('#navigator').topPage.data);
+          var tourId = document.querySelector('#navigator').topPage.data.id;
+        
+            // Set up our Google map
+            var map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 11,
+                mapTypeId: google.maps.MapTypeId.ROADMAP,
+                zoomControl: true,
+                zoomControlOptions: {
+                    position: google.maps.ControlPosition.RIGHT_CENTER
+                },
+                mapTypeControl: false,
+                scaleControl: false,
+                streetViewControl: false,
+                rotateControl: false
+            });
+            var markerTourist;
+        
+                
+        // Load the coordinates where the tour starts
+        firebase.database().ref('/tours/' + tourId + "/info").once('value').then(function(snapshot) {
+            var tourInfo = snapshot.val();
+            console.log(tourInfo);
+            
+            var markerGuide = new google.maps.Marker({
+                position: new google.maps.LatLng(tourInfo.latitude, tourInfo.longitude),
+                map: map
+            });
+            map.setCenter(new google.maps.LatLng(tourInfo.latitude, tourInfo.longitude));
+            
+            // Now subscribe to the guide position
+            firebase.database().ref('/tours/' + tourId + "/guide/location").on('value',function(snapshot) {
+                if(snapshot.val()){            
+                    var loc = snapshot.val();
+                    console.log(loc);
+                    markerGuide.setPosition(new google.maps.LatLng(loc.latitude, loc.longitude));
+                }
+                map.setCenter(new google.maps.LatLng(loc.latitude, loc.longitude));
+            
+            });
+        });
+        
+        firebase.database().ref('/tours/' + tourId + "/joined/" + fbUser.uid).on('value',function(snapshot) {
+            if(snapshot.val()){
+                var loc = snapshot.val();
+                console.log("Getting my own location");
+                
+                if(markerTourist) {
+                    console.log("Updating my marker");
+                    markerTourist.setPosition(new google.maps.LatLng(loc.latitude, loc.longitude));
+                } else {
+                    console.log("Creating my marker");
+                    markerTourist = new google.maps.Marker({
+                        position: new google.maps.LatLng(loc.latitude, loc.longitude),
+                        map: map,
+                        icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                    });
+                }
+            }
+        
+        });
+        
+        navigator.geolocation.watchPosition(shareTouristLocation, function(error) {}, { enableHighAccuracy: true });
+                 
+            
+        function shareTouristLocation(position){
+            console.log("Get current GPS Position");
+            console.log(position);            
+            console.log(currentTour);  
+            if(currentTour) {
+                
+                console.log("Sending Position");
+                firebase.database().ref().child('tours/' + currentTour + '/joined/' + fbUser.uid).set({                    
+                  latitude : position.coords.latitude,
+                  longitude : position.coords.longitude                    
+                });
+            }            
+        }        
+      }
+      
+      
+    });
+    
+    function login_after(user) {
+        fbUser = user;
+        
+        // Load user profile
+        console.log("Loading user profile");
+        firebase.database().ref('/users/' + fbUser.uid).once('value').then(function(snapshot) {
+            console.log("Loaded user profile");
+            fbUserData = snapshot.val();
+            navigator.geolocation.watchPosition(shareLocation, function(error) {}, { enableHighAccuracy: true });
+        });
+            
+        document.querySelector('#navigator').replacePage("page1.html");
+        
+    }
+    
+    function shareLocation(position){
+        console.log("Get GPS Position");
+        console.log(position);
+        
+        
+            if(currentTour) {
+                
+                console.log("Sending Position");
+                firebase.database().ref().child('tours/' + currentTour + '/joined/' + fbUser.uid).set({                    
+                  latitude : position.coords.latitude,
+                  longitude : position.coords.longitude                    
+                });
+            }
+        
+        
+        
+    }
+    
+    function showTourDetails(tourId) {
+      document.querySelector('#navigator').pushPage('page-detail.html', {data: {id: tourId}});
+    }
+  </script>
+</head>
+<body>
+  <ons-navigator id="navigator" page="page-login.html"></ons-navigator>
+
+  <ons-template id="page1.html">
+    <ons-page id="first-page">
+      <ons-toolbar>
+        <div class="center">Tours nearby</div>
+      </ons-toolbar>
+      
+      <ons-list>
+        <!--<ons-list-header>Today</ons-list-header>
+        <ons-list-item modifier="chevron" tappable id="push-buttonx" onclick="showTourDetails();">
+          <div class="center">
+            <span class="list-item__title">BANGKOK BY NIGHT</span><span class="list-item__subtitle">Oct 2nd, 18:00</span><span class="list-item__subtitle">Bangkok, Sukumvit</span>
+          </div>
+        </ons-list-item>
+        <ons-list-item modifier="chevron" tappable id="push-buttonx" onclick="">
+          <div class="center">
+            <span class="list-item__title">BANGKOK BY NIGHT</span><span class="list-item__subtitle">Oct 2nd, 18:00</span><span class="list-item__subtitle">Bangkok, Sukumvit</span>
+          </div>
+        </ons-list-item>
+    
+        <ons-list-header>Tomorrow</ons-list-header>
+        <ons-list-item modifier="chevron" tappable id="push-buttonx" onclick="">
+          <div class="center">
+            <span class="list-item__title">BANGKOK BY NIGHT</span><span class="list-item__subtitle">Oct 2nd, 18:00</span><span class="list-item__subtitle">Bangkok, Sukumvit</span>
+          </div>
+        </ons-list-item>
+        <ons-list-item modifier="chevron" tappable id="push-buttonx" onclick="">
+          <div class="center">
+            <span class="list-item__title">BANGKOK BY NIGHT</span><span class="list-item__subtitle">Oct 2nd, 18:00</span><span class="list-item__subtitle">Bangkok, Sukumvit</span>
+          </div>
+        </ons-list-item>
+        
+        <ons-list-header>Oct 3rd</ons-list-header>
+        
+        <ons-list-item modifier="chevron" tappable id="push-buttonx" onclick="">
+          <div class="center">
+            <span class="list-item__title">BANGKOK BY NIGHT</span><span class="list-item__subtitle">Oct 2nd, 18:00</span><span class="list-item__subtitle">Bangkok, Sukumvit</span>
+          </div>
+        </ons-list-item>
+        <ons-list-item modifier="chevron" tappable id="push-buttonx" onclick="">
+          <div class="center">
+            <span class="list-item__title">BANGKOK BY NIGHT</span><span class="list-item__subtitle">Oct 2nd, 18:00</span><span class="list-item__subtitle">Bangkok, Sukumvit</span>
+          </div>
+        </ons-list-item>
+        <ons-list-item modifier="chevron" tappable id="push-buttonx" onclick="">
+          <div class="center">
+            <span class="list-item__title">BANGKOK BY NIGHT</span><span class="list-item__subtitle">Oct 2nd, 18:00</span><span class="list-item__subtitle">Bangkok, Sukumvit</span>
+          </div>
+        </ons-list-item>
+        <ons-list-item modifier="chevron" tappable id="push-buttonx" onclick="">
+          <div class="center">
+            <span class="list-item__title">BANGKOK BY NIGHT</span><span class="list-item__subtitle">Oct 2nd, 18:00</span><span class="list-item__subtitle">Bangkok, Sukumvit</span>
+          </div>
+        </ons-list-item>-->
+    
+        
+      </ons-list>
+    
+      <!--<div class="content" style="text-align: center">
+        <p>This is the first page.</p>
+        <ons-button id="push-button">Push page</ons-button>
+      </div>-->
+    </ons-page>
+  </ons-template>
+
+  <ons-template id="page2.html">
+    <ons-page id="second-page">
+      <ons-toolbar>
+        <div class="left"><ons-back-button>Cancel</ons-back-button></div>
+        <div class="center">Create Tour</div>
+      </ons-toolbar>
+
+        <div class="content" style="margin:30px;align:center;">
+          <p>
+            <ons-input id="tripname" modifier="underbar" placeholder="Name of trip" float style="width: 100%;"></ons-input>
+          </p>
+          <p>
+            <ons-input id="location" modifier="underbar" placeholder="Location" float style="width: 100%;"></ons-input>
+          </p>
+          <p>
+            <ons-input id="time" modifier="underbar" placeholder="Date/Time" float style="width: 100%;"></ons-input>
+          </p>
+          <p>
+            <ons-input id="description" modifier="underbar" placeholder="Describe the tour" float style="width: 100%;"></ons-input>
+          </p>
+          <p style="margin-top: 30px;text-align: center;">
+            <ons-button id="button-save">Save Tour</ons-button>
+          </p>
+      </div>
+    </ons-page>
+  </ons-template>
+  <ons-template id="page-login.html">
+    <ons-page id="login-page">
+      <ons-toolbar>
+        <div class="center">Welcome</div>
+      </ons-toolbar>
+
+        <div style="text-align: center; margin-top: 120px;">
+            Getting you started...
+        </div>
+    </ons-page>
+  </ons-template>
+  <ons-template id="page-detail.html">
+    <ons-page id="detail-page">
+      <ons-toolbar>
+      <div class="left"><ons-back-button>Back</ons-back-button></div>
+        <div class="center">Tour Details</div>
+      </ons-toolbar>
+      
+      <div id="map" style="width: 100%; height: 50vh;"></div>
+      <ons-list>
+        <ons-list-item>
+          <div class="center">
+            Tell my guide where I am
+          </div>
+          <div class="right">
+            <ons-switch checked></ons-switch>
+          </div>
+        </ons-list-item>
+       
+    </ons-page>
+  </ons-template>
+</body>
+</html>

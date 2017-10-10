@@ -1,0 +1,22 @@
+{
+    "plugins": [
+        "mobi.monaca.plugins.Monaca"
+    ],
+    "framework_version": "3.5",
+    "xcode_version": "8",
+    "cordova_version": "6.5",
+    "plugin_settings": [],
+    "external_plugins": [
+        "cordova-plugin-whitelist@1.3.1",
+        "cordova-plugin-splashscreen@4.0.3",
+        "cordova-custom-config@2.0.3",
+        "cordova-plugin-geolocation@2.4.3"
+    ],
+    "title-ja": "",
+    "title-en": "Tour Buddy",
+    "description-ja": "",
+    "description-en": "",
+    "category": "User Template",
+    "platform": [],
+    "name": "generated-1507610606-59d07b53013eb0da6e639d44"
+}
